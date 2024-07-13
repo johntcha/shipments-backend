@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import mysql from "@fastify/mysql";
-import { routes } from "./routes.js";
 import { dbOperations } from "./db/db.js";
+import { shipmentsRoutes } from "./shipments/shipmentsRoutes.js";
 
 const fastify = Fastify({
   logger: true,
@@ -15,8 +15,7 @@ fastify.register(mysql, {
   promise: true,
 });
 
-fastify.register(routes);
-
+fastify.register(shipmentsRoutes);
 async function start() {
   try {
     await fastify.listen({ port: 3000 });
