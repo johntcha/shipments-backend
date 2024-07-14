@@ -79,7 +79,8 @@ describe("Shipments", () => {
       expect(mockConnection.query).toHaveBeenCalledTimes(2);
       expect(mockConnection.query).toHaveBeenNthCalledWith(
         2,
-        `SELECT * FROM shipments WHERE user_id = '${mockRequest.headers["user-id"]}'`
+        `SELECT * FROM shipments WHERE user_id = ?`,
+        [mockUserRows[0].user_id]
       );
       expect(mockReply.send).toHaveBeenCalledWith(mockShipmentsRows);
       expect(mockConnection.release).toHaveBeenCalled();
@@ -193,7 +194,8 @@ describe("Shipments", () => {
       expect(mockConnection.query).toHaveBeenCalledTimes(2);
       expect(mockConnection.query).toHaveBeenNthCalledWith(
         2,
-        `SELECT * FROM shipments WHERE internal_reference_name = '${mockRequest.params.internal_reference_name}'`
+        `SELECT * FROM shipments WHERE internal_reference_name = ?`,
+        ["Shipment1"]
       );
       expect(mockReply.send).toHaveBeenCalledWith(mockShipmentsRows);
       expect(mockConnection.release).toHaveBeenCalled();
@@ -227,10 +229,10 @@ describe("Shipments", () => {
       expect(mockConnection.query).toHaveBeenCalledTimes(2);
       expect(mockConnection.query).toHaveBeenNthCalledWith(
         2,
-        `
-          SELECT id, internal_reference_name, user_id, updated_at 
-          FROM shipments WHERE internal_reference_name = '${mockRequest.params.internal_reference_name}'
-          LIMIT 2`
+        `SELECT id, internal_reference_name, user_id, updated_at 
+          FROM shipments WHERE internal_reference_name = ?
+          LIMIT 2`,
+        ["Shipment1"]
       );
       expect(mockReply.send).toHaveBeenCalledWith(mockShipmentsRows);
       expect(mockConnection.release).toHaveBeenCalled();

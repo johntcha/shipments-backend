@@ -6,7 +6,8 @@ export const getAllShipments = async (request, reply, fastify) => {
       `Checking user with following user_id: ${authorizationUserId}`
     );
     const [userRows, userFields] = await connection.query(
-      `SELECT * FROM users WHERE user_id = '${authorizationUserId}'`
+      `SELECT * FROM users WHERE user_id = ?`,
+      [authorizationUserId]
     );
     if (userRows.length === 0) {
       const errorMessage = `User with user_id '${authorizationUserId}' does not exist.`;
@@ -18,12 +19,15 @@ export const getAllShipments = async (request, reply, fastify) => {
       if (user.type === "Staff") {
         query = "SELECT * FROM shipments";
       } else if (user.type === "Owner") {
-        query = `SELECT * FROM shipments WHERE user_id = '${user.user_id}'`;
+        query = `SELECT * FROM shipments WHERE user_id = ?`;
       } else {
         query = `SELECT id, internal_reference_name, user_id, updated_at FROM shipments LIMIT 2`;
       }
       fastify.log.info("Fetching all shipments from DB");
-      const [rows, fields] = await connection.query(query);
+      const [rows, fields] =
+        user.type !== "Owner"
+          ? await connection.query(query)
+          : await connection.query(query, [user.user_id]);
       fastify.log.info("Fetching all shipments from DB successful");
       reply.send(rows);
     }
@@ -47,7 +51,8 @@ export const getShipmentbyInternalReferenceName = async (
       `Checking user with following user_id: ${authorizationUserId}`
     );
     const [userRows, userFields] = await connection.query(
-      `SELECT * FROM users WHERE user_id = '${authorizationUserId}'`
+      `SELECT * FROM users WHERE user_id = ?`,
+      [authorizationUserId]
     );
     if (userRows.length === 0) {
       const errorMessage = `User with user_id '${authorizationUserId}' does not exist.`;
@@ -62,17 +67,18 @@ export const getShipmentbyInternalReferenceName = async (
       } else {
         let query = "";
         if (user.type === "Staff") {
-          query = `SELECT * FROM shipments WHERE internal_reference_name = '${internal_reference_name}'`;
+          query = `SELECT * FROM shipments WHERE internal_reference_name = ?`;
         } else {
-          query = `
-          SELECT id, internal_reference_name, user_id, updated_at 
-          FROM shipments WHERE internal_reference_name = '${internal_reference_name}'
+          query = `SELECT id, internal_reference_name, user_id, updated_at 
+          FROM shipments WHERE internal_reference_name = ?
           LIMIT 2`;
         }
         fastify.log.info(
           `Fetching shipment with following internal reference name: ${internal_reference_name}`
         );
-        const [rows, fields] = await connection.query(query);
+        const [rows, fields] = await connection.query(query, [
+          internal_reference_name,
+        ]);
         fastify.log.info("Fetching shipments from DB successful");
         reply.send(rows);
       }
@@ -100,7 +106,8 @@ export const createShipment = async (request, reply, fastify) => {
   try {
     fastify.log.info(`Checking user with following user_id: ${user_id}`);
     const [userRows, userFields] = await connection.query(
-      `SELECT * FROM users WHERE user_id = '${user_id}'`
+      `SELECT * FROM users WHERE user_id = ?`,
+      [user_id]
     );
 
     if (userRows.length === 0) {
@@ -113,7 +120,15 @@ export const createShipment = async (request, reply, fastify) => {
       );
       const [result, fields] = await connection.query(
         `INSERT INTO shipments (internal_reference_name, user_id, estimated_started_at, actual_started_at, estimated_completion_at, actual_completion_at) 
-            VALUES ('${internal_reference_name}', '${user_id}',  '${estimated_started_at}', '${actual_started_at}', '${estimated_completion_at}', '${actual_completion_at}')`
+            VALUES (?, ?,  ?, ?, ?, ?)`,
+        [
+          internal_reference_name,
+          user_id,
+          estimated_started_at,
+          actual_started_at,
+          estimated_completion_at,
+          actual_completion_at,
+        ]
       );
       fastify.log.info(
         `Created shipment with following internal reference name: ${internal_reference_name}`
@@ -144,7 +159,8 @@ export const modifyShipment = async (request, reply, fastify) => {
   try {
     fastify.log.info(`Fetching shipment with following id: ${id}`);
     const [shipmentRows, userFields] = await connection.query(
-      `SELECT * FROM shipments WHERE id = ${id}`
+      `SELECT * FROM shipments WHERE id = ?`,
+      [id]
     );
 
     if (shipmentRows.length === 0) {
@@ -154,7 +170,8 @@ export const modifyShipment = async (request, reply, fastify) => {
     } else {
       fastify.log.info(`Checking user with following user_id: ${user_id}`);
       const [userRows, userFields] = await connection.query(
-        `SELECT * FROM users WHERE user_id = '${user_id}'`
+        `SELECT * FROM users WHERE user_id = ?`,
+        [user_id]
       );
 
       if (userRows.length === 0) {
@@ -171,7 +188,16 @@ export const modifyShipment = async (request, reply, fastify) => {
         actual_started_at = '${actual_started_at}', 
         estimated_completion_at = '${estimated_completion_at}',
         actual_completion_at = '${actual_completion_at}'
-        WHERE id = ${id}`
+        WHERE id = ${id}`,
+          [
+            internal_reference_name,
+            user_id,
+            estimated_started_at,
+            actual_started_at,
+            estimated_completion_at,
+            actual_completion_at,
+            id,
+          ]
         );
         fastify.log.info(
           `Shipment with the following id has been successfully updated: ${id}`
