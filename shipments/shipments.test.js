@@ -27,28 +27,125 @@ describe("Shipments", () => {
   });
 
   describe("getAllShipments", () => {
-    it("should fetch all shipments from DB and send them", async () => {
-      const mockRequest = {};
+    it("should fetch all shipments from DB and send them if user is staff", async () => {
+      const mockRequest = {
+        headers: {
+          "user-id": "John",
+        },
+      };
       const mockReply = {
         send: jest.fn(),
       };
 
-      const mockRows = [
-        { id: 1, internal_reference_name: "Shipment1" },
-        { id: 2, internal_reference_name: "Shipment2" },
+      const mockUserRows = [{ user_id: "John", type: "Staff" }];
+      const mockShipmentsRows = [
+        { id: 1, internal_reference_name: "Shipment1", user_id: "John" },
+        { id: 2, internal_reference_name: "Shipment2", user_id: "Jane" },
+        { id: 3, internal_reference_name: "Shipment3", user_id: "Doe" },
       ];
-      mockConnection.query.mockResolvedValue([mockRows, null]);
+      mockConnection.query.mockResolvedValueOnce([mockUserRows, null]);
+      mockConnection.query.mockResolvedValueOnce([mockShipmentsRows, null]);
 
       await getAllShipments(mockRequest, mockReply, mockFastify);
 
-      expect(mockFastify.log.info).toHaveBeenCalledTimes(2);
-      expect(mockConnection.query).toHaveBeenCalled();
-      expect(mockReply.send).toHaveBeenCalledWith(mockRows);
+      expect(mockFastify.log.info).toHaveBeenCalledTimes(3);
+      expect(mockConnection.query).toHaveBeenCalledTimes(2);
+      expect(mockReply.send).toHaveBeenCalledWith(mockShipmentsRows);
+      expect(mockConnection.release).toHaveBeenCalled();
+    });
+
+    it("should only fetch user's shipments from DB and send them if user is owner", async () => {
+      const mockRequest = {
+        headers: {
+          "user-id": "John",
+        },
+      };
+      const mockReply = {
+        send: jest.fn(),
+      };
+
+      const mockUserRows = [{ user_id: "John", type: "Owner" }];
+      const mockShipmentsRows = [
+        { id: 1, internal_reference_name: "Shipment1", user_id: "John" },
+        { id: 2, internal_reference_name: "Shipment2", user_id: "John" },
+        { id: 3, internal_reference_name: "Shipment3", user_id: "John" },
+      ];
+      mockConnection.query.mockResolvedValueOnce([mockUserRows, null]);
+      mockConnection.query.mockResolvedValueOnce([mockShipmentsRows, null]);
+
+      await getAllShipments(mockRequest, mockReply, mockFastify);
+
+      expect(mockFastify.log.info).toHaveBeenCalledTimes(3);
+      expect(mockConnection.query).toHaveBeenCalledTimes(2);
+      expect(mockConnection.query).toHaveBeenNthCalledWith(
+        2,
+        `SELECT * FROM shipments WHERE user_id = '${mockRequest.headers["user-id"]}'`
+      );
+      expect(mockReply.send).toHaveBeenCalledWith(mockShipmentsRows);
+      expect(mockConnection.release).toHaveBeenCalled();
+    });
+
+    it("should fetch limited shipments from DB and send them if user is warehouse staff", async () => {
+      const mockRequest = {
+        headers: {
+          "user-id": "John",
+        },
+      };
+      const mockReply = {
+        send: jest.fn(),
+      };
+
+      const mockUserRows = [{ user_id: "John", type: "Warehouse staff" }];
+      const mockShipmentsRows = [
+        { id: 1, internal_reference_name: "Shipment1", user_id: "John" },
+        { id: 2, internal_reference_name: "Shipment2", user_id: "Jane" },
+      ];
+      mockConnection.query.mockResolvedValueOnce([mockUserRows, null]);
+      mockConnection.query.mockResolvedValueOnce([mockShipmentsRows, null]);
+
+      await getAllShipments(mockRequest, mockReply, mockFastify);
+
+      expect(mockFastify.log.info).toHaveBeenCalledTimes(3);
+      expect(mockConnection.query).toHaveBeenCalledTimes(2);
+      expect(mockConnection.query).toHaveBeenNthCalledWith(
+        2,
+        `SELECT id, internal_reference_name, user_id, updated_at FROM shipments LIMIT 2`
+      );
+      expect(mockReply.send).toHaveBeenCalledWith(mockShipmentsRows);
+      expect(mockConnection.release).toHaveBeenCalled();
+    });
+
+    it("should log an error and return status 404 if user not found", async () => {
+      const mockRequest = {
+        headers: {
+          "user-id": "Unknown",
+        },
+      };
+      const mockReply = {
+        send: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+      };
+      const mockUserRows = [];
+      mockConnection.query.mockResolvedValueOnce([mockUserRows, null]);
+
+      await getAllShipments(mockRequest, mockReply, mockFastify);
+
+      expect(mockFastify.log.info).toHaveBeenCalledTimes(1);
+      expect(mockConnection.query).toHaveBeenCalledTimes(1);
+      expect(mockFastify.log.error).toHaveBeenCalledWith(
+        `User with user_id '${mockRequest.headers["user-id"]}' does not exist.`
+      );
+      expect(mockReply.status).toHaveBeenCalledWith(404);
+      expect(mockReply.send).toHaveBeenCalled();
       expect(mockConnection.release).toHaveBeenCalled();
     });
 
     it("should log an error and return status 500 if fetching all shipments fails", async () => {
-      const mockRequest = {};
+      const mockRequest = {
+        headers: {
+          "user-id": "John",
+        },
+      };
       const mockReply = {
         send: jest.fn(),
         status: jest.fn().mockReturnThis(),
@@ -66,14 +163,25 @@ describe("Shipments", () => {
     });
   });
   describe("getShipmentbyInternalReferenceName", () => {
-    it("should fetch all shipments from DB with corresponding internal reference name and send them", async () => {
-      const mockRequest = { params: { internal_reference_name: "Shipment1" } };
+    it("should fetch all shipments from DB with corresponding internal reference name and send them if user is Staff", async () => {
+      const mockRequest = {
+        params: { internal_reference_name: "Shipment1" },
+        headers: {
+          "user-id": "John",
+        },
+      };
       const mockReply = {
         send: jest.fn(),
       };
 
-      const mockRows = [{ id: 1, internal_reference_name: "Shipment1" }];
-      mockConnection.query.mockResolvedValue([mockRows, null]);
+      const mockUserRows = [{ user_id: "John", type: "Staff" }];
+      const mockShipmentsRows = [
+        { id: 1, internal_reference_name: "Shipment1", user_id: "John" },
+        { id: 2, internal_reference_name: "Shipment1", user_id: "Jane" },
+        { id: 3, internal_reference_name: "Shipment1", user_id: "Jane" },
+      ];
+      mockConnection.query.mockResolvedValueOnce([mockUserRows, null]);
+      mockConnection.query.mockResolvedValueOnce([mockShipmentsRows, null]);
 
       await getShipmentbyInternalReferenceName(
         mockRequest,
@@ -81,14 +189,119 @@ describe("Shipments", () => {
         mockFastify
       );
 
-      expect(mockFastify.log.info).toHaveBeenCalledTimes(2);
-      expect(mockConnection.query).toHaveBeenCalled();
-      expect(mockReply.send).toHaveBeenCalledWith(mockRows);
+      expect(mockFastify.log.info).toHaveBeenCalledTimes(3);
+      expect(mockConnection.query).toHaveBeenCalledTimes(2);
+      expect(mockConnection.query).toHaveBeenNthCalledWith(
+        2,
+        `SELECT * FROM shipments WHERE internal_reference_name = '${mockRequest.params.internal_reference_name}'`
+      );
+      expect(mockReply.send).toHaveBeenCalledWith(mockShipmentsRows);
+      expect(mockConnection.release).toHaveBeenCalled();
+    });
+    it("should fetch limited shipments from DB with corresponding internal reference name and send them if user is warehouse staff", async () => {
+      const mockRequest = {
+        params: { internal_reference_name: "Shipment1" },
+        headers: {
+          "user-id": "John",
+        },
+      };
+      const mockReply = {
+        send: jest.fn(),
+      };
+
+      const mockUserRows = [{ user_id: "John", type: "Warehouse staff" }];
+      const mockShipmentsRows = [
+        { id: 1, internal_reference_name: "Shipment1", user_id: "John" },
+        { id: 2, internal_reference_name: "Shipment1", user_id: "Jane" },
+      ];
+      mockConnection.query.mockResolvedValueOnce([mockUserRows, null]);
+      mockConnection.query.mockResolvedValueOnce([mockShipmentsRows, null]);
+
+      await getShipmentbyInternalReferenceName(
+        mockRequest,
+        mockReply,
+        mockFastify
+      );
+
+      expect(mockFastify.log.info).toHaveBeenCalledTimes(3);
+      expect(mockConnection.query).toHaveBeenCalledTimes(2);
+      expect(mockConnection.query).toHaveBeenNthCalledWith(
+        2,
+        `
+          SELECT id, internal_reference_name, user_id, updated_at 
+          FROM shipments WHERE internal_reference_name = '${mockRequest.params.internal_reference_name}'
+          LIMIT 2`
+      );
+      expect(mockReply.send).toHaveBeenCalledWith(mockShipmentsRows);
       expect(mockConnection.release).toHaveBeenCalled();
     });
 
+    it("should log an error and return status 403 if user is owner", async () => {
+      const mockRequest = {
+        params: { internal_reference_name: "Shipment1" },
+        headers: {
+          "user-id": "John",
+        },
+      };
+      const mockReply = {
+        send: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+      };
+      const mockUserRows = [{ user_id: "John", type: "Owner" }];
+      mockConnection.query.mockResolvedValueOnce([mockUserRows, null]);
+
+      await getShipmentbyInternalReferenceName(
+        mockRequest,
+        mockReply,
+        mockFastify
+      );
+
+      expect(mockFastify.log.info).toHaveBeenCalledTimes(1);
+      expect(mockConnection.query).toHaveBeenCalledTimes(1);
+      expect(mockFastify.log.error).toHaveBeenCalledWith(
+        `Users with Owner type are not allowed to use this API`
+      );
+      expect(mockReply.status).toHaveBeenCalledWith(403);
+      expect(mockReply.send).toHaveBeenCalled();
+      expect(mockConnection.release).toHaveBeenCalled();
+    });
+
+    it("should log an error and return status 404 if user not found", async () => {
+      const mockRequest = {
+        params: { internal_reference_name: "Shipment1" },
+        headers: {
+          "user-id": "Unknown",
+        },
+      };
+      const mockReply = {
+        send: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+      };
+      const mockUserRows = [];
+      mockConnection.query.mockResolvedValueOnce([mockUserRows, null]);
+
+      await getShipmentbyInternalReferenceName(
+        mockRequest,
+        mockReply,
+        mockFastify
+      );
+
+      expect(mockFastify.log.info).toHaveBeenCalledTimes(1);
+      expect(mockConnection.query).toHaveBeenCalledTimes(1);
+      expect(mockFastify.log.error).toHaveBeenCalledWith(
+        `User with user_id '${mockRequest.headers["user-id"]}' does not exist.`
+      );
+      expect(mockReply.status).toHaveBeenCalledWith(404);
+      expect(mockReply.send).toHaveBeenCalled();
+      expect(mockConnection.release).toHaveBeenCalled();
+    });
     it("should log an error and return status 500 if fetching all shipments from DB with corresponding internal reference name fails", async () => {
-      const mockRequest = { params: { internal_reference_name: "Shipment1" } };
+      const mockRequest = {
+        params: { internal_reference_name: "Shipment1" },
+        headers: {
+          "user-id": "John",
+        },
+      };
       const mockReply = {
         send: jest.fn(),
         status: jest.fn().mockReturnThis(),
