@@ -2,6 +2,7 @@ import {
   getAllShipments,
   getShipmentbyInternalReferenceName,
   createShipment,
+  modifyShipment,
 } from "./shipments.js";
 
 export const shipmentsRoutes = async (fastify) => {
@@ -17,5 +18,9 @@ export const shipmentsRoutes = async (fastify) => {
   fastify.post(
     "/shipments",
     async (request, reply) => await createShipment(request, reply, fastify)
+  );
+  fastify.put(
+    "/shipments",
+    async (request, reply) => await modifyShipment(request, reply, fastify)
   );
 };
