@@ -1,10 +1,32 @@
 export const getAllShipments = async (request, reply, fastify) => {
+  const authorizationUserId = request.headers["user-id"];
   const connection = await fastify.mysql.getConnection();
   try {
-    fastify.log.info("Fetching all shipments from DB");
-    const [rows, fields] = await connection.query("SELECT * FROM shipments");
-    fastify.log.info("Fetching all shipments from DB successful");
-    reply.send(rows);
+    fastify.log.info(
+      `Checking user with following user_id: ${authorizationUserId}`
+    );
+    const [userRows, userFields] = await connection.query(
+      `SELECT * FROM users WHERE user_id = '${authorizationUserId}'`
+    );
+    if (userRows.length === 0) {
+      const errorMessage = `User with user_id '${authorizationUserId}' does not exist.`;
+      fastify.log.error(errorMessage);
+      reply.status(404).send({ error: errorMessage });
+    } else {
+      const user = userRows[0];
+      let query = "";
+      if (user.type === "Staff") {
+        query = "SELECT * FROM shipments";
+      } else if (user.type === "Owner") {
+        query = `SELECT * FROM shipments WHERE user_id = '${user.user_id}'`;
+      } else {
+        query = `SELECT id, internal_reference_name, user_id, updated_at FROM shipments LIMIT 2`;
+      }
+      fastify.log.info("Fetching all shipments from DB");
+      const [rows, fields] = await connection.query(query);
+      fastify.log.info("Fetching all shipments from DB successful");
+      reply.send(rows);
+    }
   } catch (err) {
     fastify.log.error("Error while fetching all shipments in DB:", err);
     reply.status(500).send({ error: "Error fetching shipments" });
@@ -18,16 +40,43 @@ export const getShipmentbyInternalReferenceName = async (
   fastify
 ) => {
   const { internal_reference_name } = request.params;
+  const authorizationUserId = request.headers["user-id"];
   const connection = await fastify.mysql.getConnection();
   try {
     fastify.log.info(
-      `Fetching shipment with following internal reference name: ${internal_reference_name}`
+      `Checking user with following user_id: ${authorizationUserId}`
     );
-    const [rows, fields] = await connection.query(
-      `SELECT * FROM shipments WHERE internal_reference_name = '${internal_reference_name}'`
+    const [userRows, userFields] = await connection.query(
+      `SELECT * FROM users WHERE user_id = '${authorizationUserId}'`
     );
-    fastify.log.info("Fetching shipments from DB successful");
-    reply.send(rows);
+    if (userRows.length === 0) {
+      const errorMessage = `User with user_id '${authorizationUserId}' does not exist.`;
+      fastify.log.error(errorMessage);
+      reply.status(404).send({ error: errorMessage });
+    } else {
+      const user = userRows[0];
+      if (user.type === "Owner") {
+        const errorMessage = `Users with Owner type are not allowed to use this API`;
+        fastify.log.error(errorMessage);
+        reply.status(403).send({ error: errorMessage });
+      } else {
+        let query = "";
+        if (user.type === "Staff") {
+          query = `SELECT * FROM shipments WHERE internal_reference_name = '${internal_reference_name}'`;
+        } else {
+          query = `
+          SELECT id, internal_reference_name, user_id, updated_at 
+          FROM shipments WHERE internal_reference_name = '${internal_reference_name}'
+          LIMIT 2`;
+        }
+        fastify.log.info(
+          `Fetching shipment with following internal reference name: ${internal_reference_name}`
+        );
+        const [rows, fields] = await connection.query(query);
+        fastify.log.info("Fetching shipments from DB successful");
+        reply.send(rows);
+      }
+    }
   } catch (err) {
     fastify.log.error(
       `Error while fetching shipment with following internal reference name: ${internal_reference_name}`,
