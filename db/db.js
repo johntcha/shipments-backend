@@ -8,7 +8,7 @@ const initializeDatabase = async (fastify, connection) => {
         id INT AUTO_INCREMENT PRIMARY KEY,
         internal_reference_name VARCHAR(50) NOT NULL,
         user_id VARCHAR(50) NOT NULL,
-        updated_at DATETIME,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         estimated_started_at DATETIME,
         actual_started_at DATETIME,
         estimated_completion_at DATETIME,

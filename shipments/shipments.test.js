@@ -2,6 +2,7 @@ import { jest } from "@jest/globals";
 import {
   getAllShipments,
   getShipmentbyInternalReferenceName,
+  createShipment,
 } from "./shipments.js";
 
 const mockConnection = {
@@ -35,7 +36,7 @@ describe("Shipments", () => {
         { id: 1, internal_reference_name: "Shipment1" },
         { id: 2, internal_reference_name: "Shipment2" },
       ];
-      mockConnection.query.mockResolvedValue([mockRows]);
+      mockConnection.query.mockResolvedValue([mockRows, null]);
 
       await getAllShipments(mockRequest, mockReply, mockFastify);
 
@@ -45,10 +46,11 @@ describe("Shipments", () => {
       expect(mockConnection.release).toHaveBeenCalled();
     });
 
-    it("should log an error if fetching all shipments fails", async () => {
+    it("should log an error and return status 500 if fetching all shipments fails", async () => {
       const mockRequest = {};
       const mockReply = {
         send: jest.fn(),
+        status: jest.fn().mockReturnThis(),
       };
 
       const error = new Error("Error");
@@ -57,7 +59,8 @@ describe("Shipments", () => {
       await getAllShipments(mockRequest, mockReply, mockFastify);
 
       expect(mockFastify.log.error).toHaveBeenCalled();
-      expect(mockReply.send).not.toHaveBeenCalled();
+      expect(mockReply.send).toHaveBeenCalled();
+      expect(mockReply.status).toHaveBeenCalledWith(500);
       expect(mockConnection.release).toHaveBeenCalled();
     });
   });
@@ -69,7 +72,7 @@ describe("Shipments", () => {
       };
 
       const mockRows = [{ id: 1, internal_reference_name: "Shipment1" }];
-      mockConnection.query.mockResolvedValue([mockRows]);
+      mockConnection.query.mockResolvedValue([mockRows, null]);
 
       await getShipmentbyInternalReferenceName(
         mockRequest,
@@ -83,10 +86,11 @@ describe("Shipments", () => {
       expect(mockConnection.release).toHaveBeenCalled();
     });
 
-    it("should log an error if fetching all shipments from DB with corresponding internal reference name fails", async () => {
+    it("should log an error and return status 500 if fetching all shipments from DB with corresponding internal reference name fails", async () => {
       const mockRequest = { params: { internal_reference_name: "Shipment1" } };
       const mockReply = {
         send: jest.fn(),
+        status: jest.fn().mockReturnThis(),
       };
 
       const error = new Error("Error");
@@ -99,7 +103,90 @@ describe("Shipments", () => {
       );
 
       expect(mockFastify.log.error).toHaveBeenCalled();
-      expect(mockReply.send).not.toHaveBeenCalled();
+      expect(mockReply.send).toHaveBeenCalled();
+      expect(mockReply.status).toHaveBeenCalledWith(500);
+      expect(mockConnection.release).toHaveBeenCalled();
+    });
+  });
+  describe("createShipment", () => {
+    it("should create a shipment", async () => {
+      const body = {
+        internal_reference_name: "Shipment1",
+        user_id: "John",
+        estimated_started_at: "2023-12-31 14:30:00",
+        actual_started_at: "2023-12-31 14:30:00",
+        estimated_completion_at: "2023-12-31 14:30:00",
+        actual_completion_at: "2023-12-31 14:30:00",
+      };
+      const mockRequest = { body };
+      const mockReply = {
+        send: jest.fn(),
+      };
+
+      const mockUserRows = [{ user_id: "John", type: "Owner" }];
+      const result = { insertId: 1 };
+      mockConnection.query.mockResolvedValueOnce([mockUserRows, null]);
+      mockConnection.query.mockResolvedValueOnce([result, null]);
+
+      await createShipment(mockRequest, mockReply, mockFastify);
+
+      expect(mockFastify.log.info).toHaveBeenCalledTimes(2);
+      expect(mockConnection.query).toHaveBeenCalledTimes(2);
+      expect(mockReply.send).toHaveBeenCalledWith(result.insertId);
+      expect(mockConnection.release).toHaveBeenCalled();
+    });
+
+    it("should log an error and return status 404 if user not found", async () => {
+      const body = {
+        internal_reference_name: "Shipment1",
+        user_id: "Unknown",
+        estimated_started_at: "2023-12-31 14:30:00",
+        actual_started_at: "2023-12-31 14:30:00",
+        estimated_completion_at: "2023-12-31 14:30:00",
+        actual_completion_at: "2023-12-31 14:30:00",
+      };
+      const mockRequest = { body };
+      const mockReply = {
+        send: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+      };
+
+      const mockUserRows = [];
+      mockConnection.query.mockResolvedValueOnce([mockUserRows, null]);
+
+      await createShipment(mockRequest, mockReply, mockFastify);
+
+      expect(mockConnection.query).toHaveBeenCalledTimes(1);
+      expect(mockFastify.log.error).toHaveBeenCalledWith(
+        `User with user_id '${body.user_id}' does not exist.`
+      );
+      expect(mockReply.status).toHaveBeenCalledWith(404);
+      expect(mockReply.send).toHaveBeenCalled();
+      expect(mockConnection.release).toHaveBeenCalled();
+    });
+    it("should log an error and return status 404 if creating a shipments from DB fails", async () => {
+      const body = {
+        internal_reference_name: "Shipment1",
+        user_id: "Unknown",
+        estimated_started_at: "2023-12-31 14:30:00",
+        actual_started_at: "2023-12-31 14:30:00",
+        estimated_completion_at: "2023-12-31 14:30:00",
+        actual_completion_at: "2023-12-31 14:30:00",
+      };
+      const mockRequest = { body };
+      const mockReply = {
+        send: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+      };
+
+      const error = new Error("Error");
+      mockConnection.query.mockRejectedValue(error);
+
+      await createShipment(mockRequest, mockReply, mockFastify);
+
+      expect(mockFastify.log.error).toHaveBeenCalled();
+      expect(mockReply.send).toHaveBeenCalled();
+      expect(mockReply.status).toHaveBeenCalledWith(500);
       expect(mockConnection.release).toHaveBeenCalled();
     });
   });
