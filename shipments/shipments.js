@@ -1,16 +1,14 @@
-import { getConnection } from "../db/mysql.js";
-
 export const getAllShipments = async (request, reply, fastify) => {
-  const connection = await getConnection(fastify);
+  const connection = await fastify.mysql.getConnection();
   try {
     fastify.log.info("Fetching all shipments from DB");
     const [rows, fields] = await connection.query("SELECT * FROM shipments");
-    connection.release();
     fastify.log.info("Fetching all shipments from DB successful");
     reply.send(rows);
   } catch (err) {
     fastify.log.error("Error while fetching all shipments in DB:", err);
   }
+  connection.release();
 };
 
 export const getShipmentbyInternalReferenceName = async (
@@ -19,7 +17,7 @@ export const getShipmentbyInternalReferenceName = async (
   fastify
 ) => {
   const { internal_reference_name } = request.params;
-  const connection = await getConnection(fastify);
+  const connection = await fastify.mysql.getConnection();
   try {
     fastify.log.info(
       `Fetching shipment with following internal reference name: ${internal_reference_name}`
@@ -27,7 +25,6 @@ export const getShipmentbyInternalReferenceName = async (
     const [rows, fields] = await connection.query(
       `SELECT * FROM shipments WHERE internal_reference_name = '${internal_reference_name}'`
     );
-    connection.release();
     fastify.log.info("Fetching shipments from DB successful");
     reply.send(rows);
   } catch (err) {
@@ -36,4 +33,5 @@ export const getShipmentbyInternalReferenceName = async (
       err
     );
   }
+  connection.release();
 };

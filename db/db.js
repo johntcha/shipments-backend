@@ -1,5 +1,3 @@
-import { getConnection } from "./mysql.js";
-
 const initializeDatabase = async (fastify, connection) => {
   try {
     await connection.query("CREATE DATABASE IF NOT EXISTS shippio");
@@ -67,7 +65,7 @@ const addForeignKeyUserId = async (fastify, connection) => {
 };
 
 export const dbOperations = async (fastify) => {
-  const connection = await getConnection(fastify);
+  const connection = await fastify.mysql.getConnection();
   fastify.log.info("Connection to MySQL database successful");
   await initializeDatabase(fastify, connection);
   await createUsersTable(fastify, connection);

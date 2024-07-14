@@ -9,9 +9,19 @@
   "type": "module",
   "devDependencies": {
     "eslint": "^9.7.0",
+    "jest": "^29.7.0",
     "nodemon": "^3.1.4"
   },
   "scripts": {
-    "start": "nodemon server.js"
+    "start": "nodemon server.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "transform": {},
+    "moduleFileExtensions": [
+      "js"
+    ],
+    "moduleNameMapper": {}
   }
 }
