@@ -1,7 +1,7 @@
 const initializeDatabase = async (fastify, connection) => {
   try {
-    await connection.query("CREATE DATABASE IF NOT EXISTS shippio");
-    await connection.query("USE shippio");
+    await connection.query("CREATE DATABASE IF NOT EXISTS shipments");
+    await connection.query("USE shipments");
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS shipments (
