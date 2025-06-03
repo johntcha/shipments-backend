@@ -8,7 +8,7 @@ const fastify = Fastify({
 });
 
 fastify.register(mysql, {
-  // no issue here for hardcoded username and password since it is an assignment
+  // no issue here for hardcoded username and password since it is pratice
   // but it it were a real situation, I would use .env variables
   // so I will use .env var later
   connectionString: "mysql://root:root@localhost",
